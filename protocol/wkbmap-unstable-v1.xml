@@ -1,7 +1,49 @@
-set_xkb_config(
-    rules,
-    model,
-    layout,
-    variant,
-    options
-)
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="wkbmap_unstable_v1">
+
+  <copyright>
+    Copyright © 2026 wkbmap contributors
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software.
+  </copyright>
+
+  <interface name="wkbmap_manager_unstable_v1" version="1">
+
+    <description summary="runtime XKB keyboard configuration">
+      Allows a client to request a new XKB keyboard configuration for the
+      current Wayland session.
+
+      The compositor is responsible for validating and applying the requested
+      configuration.
+    </description>
+
+    <request name="set_xkb_config">
+      <description summary="set the current XKB configuration">
+        Set the XKB keyboard configuration for the current session.
+
+        Empty strings indicate that the corresponding XKB component should
+        use its default value.
+      </description>
+
+      <arg name="rules" type="string" summary="XKB rules"/>
+      <arg name="model" type="string" summary="XKB keyboard model"/>
+      <arg name="layout" type="string" summary="XKB layout"/>
+      <arg name="variant" type="string" summary="XKB variant"/>
+      <arg name="options" type="string" summary="XKB options"/>
+    </request>
+
+    <event name="done">
+      <description summary="configuration was applied"/>
+    </event>
+
+    <event name="failed">
+      <description summary="configuration could not be applied"/>
+      <arg name="reason" type="uint" summary="failure reason"/>
+    </event>
+
+  </interface>
+</protocol>
