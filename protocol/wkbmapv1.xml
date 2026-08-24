@@ -1,0 +1,7 @@
+set_xkb_config(
+    rules,
+    model,
+    layout,
+    variant,
+    options
+)
