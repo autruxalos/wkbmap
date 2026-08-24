@@ -4,9 +4,22 @@
 
 #include "args.h"
 
+static char *duplicate_string(const char *source)
+{
+    size_t length = strlen(source) + 1;
+    char *copy = malloc(length);
+
+    if (!copy)
+        return NULL;
+
+    memcpy(copy, source, length);
+
+    return copy;
+}
+
 static int set_value(char **destination, const char *value)
 {
-    char *copy = strdup(value);
+    char *copy = duplicate_string(value);
 
     if (!copy) {
         fprintf(stderr, "wkbmap: out of memory\n");
