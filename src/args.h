@@ -2,13 +2,7 @@
 #define WKBMAP_ARGS_H
 
 typedef struct {
-    char *rules;
-    char *model;
     char *layout;
-    char *variant;
-    char *options;
-
-    int query;
     int help;
     int version;
 } WkbConfig;
