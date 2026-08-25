@@ -1,9 +1,8 @@
-#include "wayland.h"
-
 #include <stdio.h>
 
 #include "args.h"
 #include "xkb.h"
+#include "wayland.h"
 
 int main(int argc, char **argv)
 {
@@ -27,7 +26,6 @@ int main(int argc, char **argv)
     if (!config.layout) {
         fprintf(stderr,
                 "wkbmap: no layout specified\n");
-
         fprintf(stderr,
                 "Try 'wkbmap --help' for more information.\n");
 
@@ -44,9 +42,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("layout: %s\n", config.layout);
+    int result = wkbmap_set_layout(config.layout);
 
     free_config(&config);
 
-    return 0;
+    return result;
 }
