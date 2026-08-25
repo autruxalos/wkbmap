@@ -4,24 +4,25 @@
 
 #include "xkb.h"
 
-int xkb_validate(const WkbConfig *config)
+int xkb_layout_exists(const char *layout)
 {
     struct xkb_context *context;
     struct xkb_keymap *keymap;
 
     struct xkb_rule_names names = {
-        .rules = config->rules,
-        .model = config->model,
-        .layout = config->layout,
-        .variant = config->variant,
-        .options = config->options
+        .rules = NULL,
+        .model = NULL,
+        .layout = layout,
+        .variant = NULL,
+        .options = NULL
     };
 
     context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 
     if (!context) {
-        fprintf(stderr, "wkbmap: failed to create XKB context\n");
-        return 1;
+        fprintf(stderr,
+                "wkbmap: failed to create XKB context\n");
+        return 0;
     }
 
     keymap = xkb_keymap_new_from_names(
@@ -31,13 +32,12 @@ int xkb_validate(const WkbConfig *config)
     );
 
     if (!keymap) {
-        fprintf(stderr, "wkbmap: failed to compile XKB keymap\n");
         xkb_context_unref(context);
-        return 1;
+        return 0;
     }
 
     xkb_keymap_unref(keymap);
     xkb_context_unref(context);
 
-    return 0;
+    return 1;
 }
