@@ -1,3 +1,5 @@
+#include "wayland.h"
+
 #include <stdio.h>
 
 #include "args.h"
