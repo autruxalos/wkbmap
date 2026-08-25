@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string.h>
 
 #include "args.h"
 #include "xkb.h"
@@ -23,15 +22,9 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (!config.layout &&
-        !config.variant &&
-        !config.options &&
-        !config.model &&
-        !config.rules &&
-        !config.query) {
-
+    if (!config.layout) {
         fprintf(stderr,
-                "wkbmap: no keyboard configuration specified\n");
+                "wkbmap: no layout specified\n");
 
         fprintf(stderr,
                 "Try 'wkbmap --help' for more information.\n");
@@ -40,35 +33,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (config.query) {
+    if (!xkb_layout_exists(config.layout)) {
         fprintf(stderr,
-                "wkbmap: query is not implemented yet\n");
+                "wkbmap: unknown XKB layout: %s\n",
+                config.layout);
 
         free_config(&config);
         return 1;
     }
 
-    if (xkb_validate(&config)) {
-        free_config(&config);
-        return 1;
-    }
-
-    printf("XKB configuration is valid.\n");
-
-    if (config.layout)
-        printf("layout: %s\n", config.layout);
-
-    if (config.variant)
-        printf("variant: %s\n", config.variant);
-
-    if (config.options)
-        printf("option: %s\n", config.options);
-
-    if (config.model)
-        printf("model: %s\n", config.model);
-
-    if (config.rules)
-        printf("rules: %s\n", config.rules);
+    printf("layout: %s\n", config.layout);
 
     free_config(&config);
 
