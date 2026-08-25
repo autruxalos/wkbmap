@@ -1,30 +1,24 @@
-CC ?= cc
+CC = cc
 
-CFLAGS ?= -O2 -Wall -Wextra -std=c11
-LDLIBS = -lxkbcommon
+CFLAGS = -O2 -Wall -Wextra -std=c11
+LDLIBS = -lxkbcommon -lwayland-client
 
 TARGET = wkbmap
 
-SOURCES = \
+SRC = \
 	src/main.c \
 	src/args.c \
-	src/xkb.c
+	src/xkb.c \
+	src/wayland.c \
+	src/wkbmap-protocol.c
 
-OBJECTS = $(SOURCES:.c=.o)
+OBJ = $(SRC:.c=.o)
 
-all: $(TARGET)
+$(TARGET): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) $(LDLIBS) -o $(TARGET)
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(CFLAGS) $(OBJECTS) $(LDLIBS) -o $@
+install: $(TARGET)
+	install -Dm755 $(TARGET) /usr/bin/wkbmap
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
-
-install:
-	install -Dm755 $(TARGET) \
-		$(DESTDIR)/usr/bin/$(TARGET)
-
-uninstall:
-	rm -f $(DESTDIR)/usr/bin/$(TARGET)
-
-.PHONY: all clean install uninstall
+	rm -f $(OBJ) $(TARGET)
