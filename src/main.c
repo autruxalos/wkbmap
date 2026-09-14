@@ -15,6 +15,7 @@ struct wkb_state {
     struct xkb_layout_manager_v1 *manager;
     struct xkb_layout_keyboard_v1 *keyboard;
 
+    const char *requested_layout;
     int layout_received;
 };
 
