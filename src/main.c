@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include <wayland-client.h>
-#include <xkbcommon/xkbcommon.h>
 
 #include "args.h"
 #include "xkb.h"
@@ -12,7 +11,28 @@
 struct wkb_state {
     struct wl_display *display;
     struct wl_registry *registry;
-    struct wkbmap_manager_unstable_v1 *manager;
+    struct wl_seat *seat;
+    struct xkb_layout_manager_v1 *manager;
+    struct xkb_layout_keyboard_v1 *keyboard;
+
+    int layout_received;
+};
+
+static void keyboard_layout(
+    void *data,
+    struct xkb_layout_keyboard_v1 *keyboard,
+    const char *layout)
+{
+    struct wkb_state *state = data;
+
+    (void)keyboard;
+
+    if (!strcmp(layout, state->requested_layout))
+        state->layout_received = 1;
+}
+
+static const struct xkb_layout_keyboard_v1_listener keyboard_listener = {
+    .layout = keyboard_layout
 };
 
 static void registry_global(
@@ -24,12 +44,22 @@ static void registry_global(
 {
     struct wkb_state *state = data;
 
-    if (!strcmp(interface, "wkbmap_manager_unstable_v1")) {
+    if (!strcmp(interface, "wl_seat")) {
+        state->seat =
+            wl_registry_bind(
+                registry,
+                name,
+                &wl_seat_interface,
+                version < 7 ? version : 7
+            );
+    }
+
+    else if (!strcmp(interface, "xkb_layout_manager_v1")) {
         state->manager =
             wl_registry_bind(
                 registry,
                 name,
-                &wkbmap_manager_unstable_v1_interface,
+                &xkb_layout_manager_v1_interface,
                 version < 1 ? version : 1
             );
     }
@@ -54,10 +84,8 @@ int main(int argc, char **argv)
 {
     WkbConfig config = {0};
 
-    if (parse_args(argc, argv, &config)) {
-        free_config(&config);
+    if (parse_args(argc, argv, &config))
         return EXIT_FAILURE;
-    }
 
     if (config.help) {
         print_help();
@@ -75,37 +103,35 @@ int main(int argc, char **argv)
         fprintf(stderr,
                 "wkbmap: no layout specified\n"
                 "Try 'wkbmap --help' for usage.\n");
+
         free_config(&config);
         return EXIT_FAILURE;
     }
 
     if (!xkb_layout_exists(config.layout)) {
         fprintf(stderr,
-                "wkbmap: failed to compile XKB keymap\n");
+                "wkbmap: invalid XKB layout: %s\n",
+                config.layout);
+
         free_config(&config);
         return EXIT_FAILURE;
     }
 
     struct wkb_state state = {0};
 
+    state.requested_layout = config.layout;
+
     state.display = wl_display_connect(NULL);
 
     if (!state.display) {
         fprintf(stderr,
                 "wkbmap: failed to connect to Wayland display\n");
+
         free_config(&config);
         return EXIT_FAILURE;
     }
 
     state.registry = wl_display_get_registry(state.display);
-
-    if (!state.registry) {
-        fprintf(stderr,
-                "wkbmap: failed to get Wayland registry\n");
-        wl_display_disconnect(state.display);
-        free_config(&config);
-        return EXIT_FAILURE;
-    }
 
     wl_registry_add_listener(
         state.registry,
@@ -116,6 +142,7 @@ int main(int argc, char **argv)
     if (wl_display_roundtrip(state.display) < 0) {
         fprintf(stderr,
                 "wkbmap: Wayland roundtrip failed\n");
+
         wl_display_disconnect(state.display);
         free_config(&config);
         return EXIT_FAILURE;
@@ -123,28 +150,66 @@ int main(int argc, char **argv)
 
     if (!state.manager) {
         fprintf(stderr,
-                "wkbmap: wkbmap protocol is not supported by this compositor\n");
+                "wkbmap: compositor does not implement xkb-layout-v1\n");
+
         wl_display_disconnect(state.display);
         free_config(&config);
         return EXIT_FAILURE;
     }
 
-    wkbmap_manager_unstable_v1_set_layout(
-        state.manager,
+    if (!state.seat) {
+        fprintf(stderr,
+                "wkbmap: compositor did not provide a Wayland seat\n");
+
+        wl_display_disconnect(state.display);
+        free_config(&config);
+        return EXIT_FAILURE;
+    }
+
+    state.keyboard =
+        xkb_layout_manager_v1_get_keyboard(
+            state.manager,
+            state.seat
+        );
+
+    xkb_layout_keyboard_v1_add_listener(
+        state.keyboard,
+        &keyboard_listener,
+        &state
+    );
+
+    xkb_layout_keyboard_v1_set_layout(
+        state.keyboard,
         config.layout
     );
 
     if (wl_display_roundtrip(state.display) < 0) {
         fprintf(stderr,
-                "wkbmap: failed to send layout request\n");
+                "wkbmap: failed to communicate with compositor\n");
 
-        wkbmap_manager_unstable_v1_destroy(state.manager);
+        xkb_layout_keyboard_v1_destroy(state.keyboard);
+        xkb_layout_manager_v1_destroy(state.manager);
         wl_display_disconnect(state.display);
         free_config(&config);
         return EXIT_FAILURE;
     }
 
-    wkbmap_manager_unstable_v1_destroy(state.manager);
+    if (!state.layout_received) {
+        fprintf(stderr,
+                "wkbmap: compositor did not apply layout: %s\n",
+                config.layout);
+
+        xkb_layout_keyboard_v1_destroy(state.keyboard);
+        xkb_layout_manager_v1_destroy(state.manager);
+        wl_display_disconnect(state.display);
+        free_config(&config);
+        return EXIT_FAILURE;
+    }
+
+    printf("layout: %s\n", config.layout);
+
+    xkb_layout_keyboard_v1_destroy(state.keyboard);
+    xkb_layout_manager_v1_destroy(state.manager);
     wl_display_disconnect(state.display);
 
     free_config(&config);
