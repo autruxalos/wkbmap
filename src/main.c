@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <wayland-client.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "args.h"
 #include "xkb.h"
@@ -10,37 +11,8 @@
 
 struct wkb_state {
     struct wl_display *display;
+    struct wl_registry *registry;
     struct wkbmap_manager_unstable_v1 *manager;
-
-    int done;
-    int failed;
-};
-
-static void manager_done(
-    void *data,
-    struct wkbmap_manager_unstable_v1 *manager)
-{
-    (void)manager;
-
-    struct wkb_state *state = data;
-    state->done = 1;
-}
-
-static void manager_failed(
-    void *data,
-    struct wkbmap_manager_unstable_v1 *manager,
-    uint32_t reason)
-{
-    (void)manager;
-    (void)reason;
-
-    struct wkb_state *state = data;
-    state->failed = 1;
-}
-
-static const struct wkbmap_manager_unstable_v1_listener manager_listener = {
-    .done = manager_done,
-    .failed = manager_failed
 };
 
 static void registry_global(
@@ -60,12 +32,6 @@ static void registry_global(
                 &wkbmap_manager_unstable_v1_interface,
                 version < 1 ? version : 1
             );
-
-        wkbmap_manager_unstable_v1_add_listener(
-            state->manager,
-            &manager_listener,
-            state
-        );
     }
 }
 
@@ -87,71 +53,80 @@ static const struct wl_registry_listener registry_listener = {
 int main(int argc, char **argv)
 {
     WkbConfig config = {0};
-    struct wkb_state state = {0};
 
-    if (parse_args(argc, argv, &config))
-        return 1;
+    if (parse_args(argc, argv, &config)) {
+        free_config(&config);
+        return EXIT_FAILURE;
+    }
 
     if (config.help) {
         print_help();
         free_config(&config);
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     if (config.version) {
         print_version();
         free_config(&config);
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     if (!config.layout) {
-        fprintf(stderr, "wkbmap: no layout specified\n");
+        fprintf(stderr,
+                "wkbmap: no layout specified\n"
+                "Try 'wkbmap --help' for usage.\n");
         free_config(&config);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (!xkb_layout_exists(config.layout)) {
         fprintf(stderr,
-                "wkbmap: unknown XKB layout: %s\n",
-                config.layout);
+                "wkbmap: failed to compile XKB keymap\n");
         free_config(&config);
-        return 1;
+        return EXIT_FAILURE;
     }
+
+    struct wkb_state state = {0};
 
     state.display = wl_display_connect(NULL);
 
     if (!state.display) {
         fprintf(stderr,
-                "wkbmap: unable to connect to Wayland display\n");
+                "wkbmap: failed to connect to Wayland display\n");
         free_config(&config);
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    struct wl_registry *registry =
-        wl_display_get_registry(state.display);
+    state.registry = wl_display_get_registry(state.display);
+
+    if (!state.registry) {
+        fprintf(stderr,
+                "wkbmap: failed to get Wayland registry\n");
+        wl_display_disconnect(state.display);
+        free_config(&config);
+        return EXIT_FAILURE;
+    }
 
     wl_registry_add_listener(
-        registry,
+        state.registry,
         &registry_listener,
         &state
     );
 
     if (wl_display_roundtrip(state.display) < 0) {
         fprintf(stderr,
-                "wkbmap: Wayland communication failed\n");
-
+                "wkbmap: Wayland roundtrip failed\n");
         wl_display_disconnect(state.display);
         free_config(&config);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (!state.manager) {
         fprintf(stderr,
-                "wkbmap: compositor does not support wkbmap\n");
-
+                "wkbmap: wkbmap protocol is not supported by this compositor\n");
         wl_display_disconnect(state.display);
         free_config(&config);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     wkbmap_manager_unstable_v1_set_layout(
@@ -161,39 +136,18 @@ int main(int argc, char **argv)
 
     if (wl_display_roundtrip(state.display) < 0) {
         fprintf(stderr,
-                "wkbmap: Wayland communication failed\n");
+                "wkbmap: failed to send layout request\n");
 
         wkbmap_manager_unstable_v1_destroy(state.manager);
         wl_display_disconnect(state.display);
         free_config(&config);
-        return 1;
+        return EXIT_FAILURE;
     }
-
-    if (state.failed) {
-        fprintf(stderr,
-                "wkbmap: compositor rejected layout\n");
-
-        wkbmap_manager_unstable_v1_destroy(state.manager);
-        wl_display_disconnect(state.display);
-        free_config(&config);
-        return 1;
-    }
-
-    if (!state.done) {
-        fprintf(stderr,
-                "wkbmap: compositor did not confirm layout\n");
-
-        wkbmap_manager_unstable_v1_destroy(state.manager);
-        wl_display_disconnect(state.display);
-        free_config(&config);
-        return 1;
-    }
-
-    printf("layout: %s\n", config.layout);
 
     wkbmap_manager_unstable_v1_destroy(state.manager);
     wl_display_disconnect(state.display);
+
     free_config(&config);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
