@@ -1,57 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<protocol name="xkb_layout_unstable_v1">
+<protocol name="wkbmap_unstable_v1">
 
-  <interface name="xkb_layout_manager_v1" version="1">
+  <interface name="wkbmap_manager_unstable_v1" version="1">
 
     <description summary="Wayland keyboard layout configuration">
-      Allows a client to configure the XKB keyboard layout of a Wayland
-      seat using the system XKB layout database.
+      Provides runtime configuration of the XKB keyboard layout
+      associated with a Wayland seat.
     </description>
 
     <request name="get_keyboard">
-      <description summary="get keyboard layout object">
-        Create an object for configuring the keyboard layout of a seat.
+      <description summary="get keyboard configuration">
+        Create an object for configuring the keyboard associated with
+        the specified Wayland seat.
       </description>
 
-      <arg name="id" type="new_id" interface="xkb_layout_keyboard_v1"/>
-      <arg name="seat" type="object" interface="wl_seat"/>
+      <arg name="id" type="new_id"
+           interface="wkbmap_keyboard_unstable_v1"/>
+
+      <arg name="seat" type="object"
+           interface="wl_seat"/>
     </request>
 
   </interface>
 
-  <interface name="xkb_layout_keyboard_v1" version="1">
+  <interface name="wkbmap_keyboard_unstable_v1" version="1">
 
-    <description summary="XKB keyboard layout">
-      Controls the XKB layout configuration of a Wayland seat.
+    <description summary="Wayland XKB keyboard configuration">
+      Provides runtime configuration of the XKB layout associated
+      with a Wayland keyboard seat.
     </description>
 
     <enum name="error">
-      <entry name="invalid_layout" value="0"
-             summary="the requested XKB layout does not exist"/>
-      <entry name="failed" value="1"
+      <entry name="invalid_layout"
+             value="0"
+             summary="the requested XKB layout is invalid"/>
+
+      <entry name="failed"
+             value="1"
              summary="the compositor failed to apply the layout"/>
     </enum>
 
     <request name="destroy" type="destructor">
-      <description summary="destroy the keyboard layout object"/>
+      <description summary="destroy the keyboard configuration object"/>
     </request>
 
     <request name="set_layout">
-      <description summary="set the XKB keyboard layout">
-        Set the keyboard layout using the system XKB layout database.
-        The compositor is responsible for loading and applying the
-        requested layout.
+      <description summary="set the XKB layout">
+        Set the keyboard layout using the compositor's system XKB
+        layout database.
+
+        The compositor is responsible for resolving the layout and
+        applying the resulting XKB configuration to the seat.
       </description>
 
-      <arg name="layout" type="string" summary="XKB layout name"/>
+      <arg name="layout"
+           type="string"
+           summary="XKB layout name"/>
     </request>
-wkbmap: wkbmap protocol is not supported by this compositor
+
     <event name="layout">
-      <description summary="current keyboard layout">
-        The currently active XKB layout.
+      <description summary="current XKB layout">
+        Announces the currently active XKB layout.
       </description>
 
-      <arg name="layout" type="string" summary="XKB layout name"/>
+      <arg name="layout"
+           type="string"
+           summary="XKB layout name"/>
     </event>
 
   </interface>
